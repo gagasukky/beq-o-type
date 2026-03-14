@@ -465,12 +465,13 @@
 
             const prompt = `あなたは深海冒険タイピングのシナリオライター。小学校${grade}年生向け。
 【主人公】ジンベエザメのベコちゃん。元気で好奇心旺盛。
-ベコちゃんが水深${currentD}m付近で体験するワクワクする出来事を15問作成。11000mを超えていたら宇宙の景色を描写。
+ベコちゃんが水深${currentD}m付近で体験するワクワクする出来事を15問作成。11000mを超えていたら宇宙の景色。
 【ルール】
 1. 返事は絶対に純粋なJSON形式のみ。
 2. {"problems": [{"kanji": "...", "kana": "..."}]} の形式を守る。
 3. 同じ文章の繰り返しや単調な文は厳禁。ベコちゃんのセリフを混ぜる。
-4. 読み仮名(kana)には必ず単語ごとに半角スペースを入れる。`;
+4. 子どもがタイピングしやすいよう、一文は短く（10〜15文字以内）すること。長い文章は不可。
+5. 読み仮名(kana)はタイピング判定用のため、必ず「ひらがなのみ」にすること。カタカナ・漢字・アルファベットは絶対に含めない。単語ごとに半角スペースを入れる。`;
 
             // エンドポイントの修正: 固定モデル名でのエラーを避けるため、
             // APIキーで利用可能なモデル一覧を取得し、最新のFlashモデルを自動選択します。
@@ -518,6 +519,19 @@
                 const res = await response.json();
                 const text = res.candidates[0].content.parts[0].text;
                 const data = JSON.parse(text);
+                
+                // フリーズ対策：APIがカタカナやアルファベットを返してきた場合の強制サニタイズ
+                if (data.problems) {
+                    data.problems.forEach(p => {
+                        if (p.kana) {
+                            // カタカナをひらがなに変換
+                            p.kana = p.kana.replace(/[\u30A1-\u30F6]/g, match => String.fromCharCode(match.charCodeAt(0) - 0x60));
+                            // ローマ字マップにない文字（半角英数、未対応記号など）を強制削除（スペースと一部記号は残す）
+                            p.kana = p.kana.replace(/[^あ-んー、。！？ \u3000]/g, '');
+                        }
+                    });
+                }
+                
                 return data.problems;
             } catch (e) {
                 console.error("API Error:", e);
