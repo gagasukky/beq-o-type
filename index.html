@@ -472,11 +472,33 @@
 3. 同じ文章の繰り返しや単調な文は厳禁。ベコちゃんのセリフを混ぜる。
 4. 読み仮名(kana)には必ず単語ごとに半角スペースを入れる。`;
 
-            // エンドポイントの修正:
-            // v1beta の gemini-1.5-flash が見つからない問題に対して、
-            // gemini-1.5-flash-latest を明示的に指定します。
-            const modelName = "gemini-1.5-flash-latest"; 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${userApiKey}`;
+            // エンドポイントの修正: 固定モデル名でのエラーを避けるため、
+            // APIキーで利用可能なモデル一覧を取得し、最新のFlashモデルを自動選択します。
+            let targetModel = "gemini-2.0-flash"; // デフォルトのフォールバック
+            try {
+                const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${userApiKey}`);
+                if (modelsRes.ok) {
+                    const modelsData = await modelsRes.json();
+                    if (modelsData.models) {
+                        const available = modelsData.models.filter(m => 
+                            m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent")
+                        );
+                        const flashModels = available.filter(m => m.name.includes("flash"));
+                        
+                        if (flashModels.length > 0) {
+                            // 名前の降順ソートで最新っぽいものを取る (ex: gemini-2.5-flash > gemini-2.0-flash)
+                            flashModels.sort((a, b) => b.name.localeCompare(a.name));
+                            targetModel = flashModels[0].name.replace("models/", "");
+                        } else if (available.length > 0) {
+                            targetModel = available[0].name.replace("models/", "");
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn("モデル自動検出エラー:", err);
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${userApiKey}`;
 
             try {
                 const response = await fetch(url, {
