@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ocean Typer - Beko-chan's Cosmic Adventure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000b1a;
+            color: #e0f2fe;
+            font-family: 'Zen Maru Gothic', sans-serif;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #game-canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+
+        .glass-panel {
+            background: rgba(0, 15, 30, 0.7);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 1.5rem;
+        }
+
+        .typing-input-shadow {
+            text-shadow: 0 0 20px rgba(0, 255, 255, 1);
+        }
+
+        #hidden-input {
+            position: absolute;
+            opacity: 0;
+            top: -100px;
+        }
+
+        /* UIの重なりを防ぐコンパクトなパートナー窓 */
+        .beko-window {
+            position: fixed;
+            bottom: 0.5rem;
+            left: 0.5rem;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            pointer-events: none;
+        }
+
+        .beko-face-container {
+            width: 150px;
+            height: 90px;
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+            background: radial-gradient(circle, #002244, #000b1a);
+            border-radius: 30px / 20px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-dots:after {
+            content: '.';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+
+        @keyframes dots {
+
+            0%,
+            20% {
+                content: '.';
+            }
+
+            40% {
+                content: '..';
+            }
+
+            60% {
+                content: '...';
+            }
+
+            80%,
+            100% {
+                content: '';
+            }
+        }
+
+        .wrap-text {
+            word-break: break-all;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+        }
+
+        input[type=range],
+        input[type=password],
+        input[type=text] {
+            accent-color: #00ffff;
+        }
+
+        #retire-btn:hover {
+            background: rgba(239, 68, 68, 0.4);
+            border-color: #ef4444;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="ui-layer" class="absolute inset-0 z-10 flex flex-col items-center justify-center p-4">
+        <!-- START SCREEN -->
+        <div id="start-screen" class="glass-panel p-6 md:p-10 max-w-2xl w-full text-center pointer-events-auto">
+            <h1 class="text-4xl md:text-6xl font-bold mb-4 text-cyan-300 tracking-tighter">深海タイピング</h1>
+            <p class="text-lg mb-6 text-cyan-100 italic">ベコちゃんと世界の果てへ…</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-left">
+                <div>
+                    <label class="block text-xs font-bold mb-1 text-cyan-400">【学年】</label>
+                    <select id="grade-select"
+                        class="w-full bg-blue-900/60 border border-cyan-500 rounded-xl p-2 text-white outline-none text-sm cursor-pointer">
+                        <option value="1">小学1年生</option>
+                        <option value="2">小学2年生</option>
+                        <option value="3" selected>小学3年生</option>
+                        <option value="4">小学4年生</option>
+                        <option value="5">小学5年生</option>
+                        <option value="6">小学6年生</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1 text-cyan-400">【目標深度】</label>
+                    <select id="goal-depth-select"
+                        class="w-full bg-blue-900/60 border border-cyan-500 rounded-xl p-2 text-white outline-none text-sm cursor-pointer">
+                        <option value="1000">深海の入り口 (1,000m)</option>
+                        <option value="5000">深海調査 (5,000m)</option>
+                        <option value="11000" selected>地球の最深部 (11,000m)</option>
+                        <option value="25000">その先の宇宙へ (25,000m)</option>
+                    </select>
+                </div>
+                <div class="col-span-1 md:col-span-2">
+                    <label class="block text-xs font-bold mb-1 text-cyan-400 font-mono">Google Gemini API Key</label>
+                    <input type="password" id="api-key-input" placeholder="AIZA... で始まるキーを入力"
+                        class="w-full bg-black/40 border border-cyan-500/50 rounded-xl p-2 text-white outline-none text-sm font-mono shadow-inner">
+                    <p class="text-[10px] text-cyan-200/60 mt-1">※キーはブラウザに保存されます。入力するとAIが物語を自動生成します。</p>
+                </div>
+                <div class="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 mt-1">
+                    <div>
+                        <label class="block text-[10px] font-bold mb-1 text-cyan-400 text-center">BGM 音量</label>
+                        <input type="range" id="bgm-volume" min="0" max="100" value="40"
+                            class="w-full h-1.5 bg-blue-900 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold mb-1 text-cyan-400 text-center">効果音 音量</label>
+                        <input type="range" id="se-volume" min="0" max="100" value="60"
+                            class="w-full h-1.5 bg-blue-900 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <button id="start-btn"
+                class="bg-cyan-500 hover:bg-cyan-400 text-blue-950 font-bold py-3 px-10 rounded-full text-xl md:text-2xl transition-all transform hover:scale-105 shadow-2xl">
+                潜航を開始する
+            </button>
+        </div>
+
+        <!-- LOADING SCREEN -->
+        <div id="loading-screen" class="hidden glass-panel p-10 max-w-xl w-full text-center pointer-events-auto">
+            <div id="loading-title" class="text-4xl font-bold mb-4 text-cyan-300">冒険の準備中</div>
+            <p id="loading-msg" class="text-cyan-100 text-lg">ベコちゃんが気合を入れています…</p>
+            <div id="error-container" class="hidden mt-6 text-left">
+                <div class="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-xl text-xs font-mono mb-4 overflow-auto max-h-40"
+                    id="error-log"></div>
+                <button id="error-back-btn"
+                    class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-6 rounded-full text-sm transition-all shadow-lg pointer-events-auto">タイトルに戻って設定しなおす</button>
+            </div>
+        </div>
+
+        <!-- GAME UI -->
+        <div id="game-ui" class="hidden absolute inset-0 pointer-events-none flex flex-col justify-between p-6">
+            <div class="flex justify-between items-start w-full pointer-events-none">
+                <div class="glass-panel px-4 py-2">
+                    <div id="stage-display"
+                        class="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mb-1 text-nowrap">Diving
+                        Status</div>
+                    <div id="zone-display" class="text-xs md:text-sm font-bold text-cyan-200">Sunlight Zone</div>
+                </div>
+                <div class="flex items-start gap-4">
+                    <div class="glass-panel px-4 py-2 text-center">
+                        <div class="text-[10px] uppercase text-cyan-400 mb-1">Current Depth</div>
+                        <div id="depth-display"
+                            class="text-lg md:text-2xl font-bold text-white typing-input-shadow whitespace-nowrap">0 m /
+                            0 m</div>
+                    </div>
+                    <button id="retire-btn"
+                        class="pointer-events-auto glass-panel px-4 py-3 text-red-400 font-bold text-[10px] uppercase transition-all border-red-500/30 cursor-pointer">
+                        冒険を中断
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-col items-center justify-center flex-grow w-full max-w-5xl mx-auto px-4 mb-20">
+                <div id="target-kanji"
+                    class="wrap-text text-2xl md:text-5xl lg:text-6xl font-bold mb-4 text-white drop-shadow-2xl text-center leading-tight">
+                    ---</div>
+                <div class="w-full glass-panel p-4 mb-6 border-cyan-500/20">
+                    <div id="target-kana"
+                        class="wrap-text text-md md:text-xl lg:text-2xl text-cyan-300 tracking-[0.2em] text-center font-bold">
+                        ---</div>
+                </div>
+                <div id="romaji-container"
+                    class="wrap-text text-xl md:text-3xl lg:text-5xl font-mono font-bold tracking-normal bg-black/60 px-6 py-8 md:px-8 md:py-10 rounded-[2rem] border-2 border-cyan-400/30 text-center w-full shadow-2xl overflow-hidden min-h-[100px] flex items-center justify-center">
+                    <span id="romaji-todo" class="text-white typing-input-shadow"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULT SCREEN -->
+        <div id="result-screen" class="hidden glass-panel p-12 max-w-xl w-full text-center pointer-events-auto">
+            <h2 id="result-title" class="text-4xl font-bold mb-6 text-cyan-300">冒険記録</h2>
+            <div class="space-y-6 mb-10 text-xl text-cyan-100">
+                <div class="flex justify-around bg-blue-900/40 p-6 rounded-2xl">
+                    <div>
+                        <p class="text-sm uppercase opacity-70">到達深度</p>
+                        <p id="final-depth" class="text-4xl font-bold text-white">0 m</p>
+                    </div>
+                    <div>
+                        <p class="text-sm uppercase opacity-70">正確さ</p>
+                        <p id="accuracy-rate" class="text-4xl font-bold text-white">0 %</p>
+                    </div>
+                </div>
+                <p id="result-msg" class="italic">「また一緒に潜ろうね！」</p>
+            </div>
+            <button id="retry-btn"
+                class="bg-cyan-500 text-blue-950 font-bold py-5 px-8 rounded-full text-2xl hover:scale-105 transition-all shadow-xl cursor-pointer font-bold">タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- PARTNER WINDOW -->
+    <div id="beko-partner-window" class="beko-window hidden">
+        <div class="beko-face-container">
+            <canvas id="beko-face-canvas" width="150" height="90"></canvas>
+        </div>
+        <div class="glass-panel px-4 py-2 min-w-[200px] max-w-[250px]">
+            <p class="text-cyan-300 font-bold text-[10px] md:text-sm mb-0.5">ベコちゃん</p>
+            <p id="beko-status-text" class="text-[11px] md:text-xs opacity-95 text-white leading-tight">スイスイ進もう！</p>
+        </div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+    <input type="text" id="hidden-input" autocomplete="off" autocapitalize="off" spellcheck="false">
+
+    <script>
+        const SoundSystem = {
+            ctx: null, bgmNodes: [], masterGain: null, seGain: null, seVolume: 0.6, bgmVolume: 0.4,
+            init() {
+                if (this.ctx) return;
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.masterGain = this.ctx.createGain();
+                this.seGain = this.ctx.createGain();
+                this.masterGain.connect(this.ctx.destination);
+                this.seGain.connect(this.ctx.destination);
+            },
+            updateVolumes() {
+                this.bgmVolume = document.getElementById('bgm-volume').value / 100;
+                this.seVolume = document.getElementById('se-volume').value / 100;
+                if (this.bgmNodes.length > 0) this.bgmNodes.forEach(node => node.gainNode.gain.setTargetAtTime(node.baseVol * this.bgmVolume, this.ctx.currentTime, 0.5));
+                if (this.seGain) this.seGain.gain.value = this.seVolume;
+            },
+            async playBGM() {
+                this.init(); if (this.ctx.state === 'suspended') await this.ctx.resume();
+                if (this.bgmNodes.length > 0) return;
+                this.updateVolumes();
+                const createLayer = (freq, vol) => {
+                    const osc = this.ctx.createOscillator(); const g = this.ctx.createGain();
+                    osc.type = 'sine'; osc.frequency.value = freq; g.gain.value = 0;
+                    osc.connect(g); g.connect(this.masterGain); osc.start();
+                    g.gain.setTargetAtTime(vol * this.bgmVolume, this.ctx.currentTime, 2);
+                    return { gainNode: g, baseVol: vol };
+                };
+                this.bgmNodes = [createLayer(130.81, 0.3), createLayer(196.00, 0.2), createLayer(329.63, 0.1)];
+            },
+            playType() { if (this.ctx) { const o = this.ctx.createOscillator(); const g = this.ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(1000 + Math.random() * 200, this.ctx.currentTime); g.gain.setValueAtTime(0.04 * this.seVolume, this.ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1); o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + 0.1); } },
+            playMiss() { if (this.ctx) { const o = this.ctx.createOscillator(); const g = this.ctx.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(100, this.ctx.currentTime); o.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.2); g.gain.setValueAtTime(0.1 * this.seVolume, this.ctx.currentTime); o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + 0.2); } },
+            playClear() { if (this.ctx) { [523, 659, 783, 1046].forEach((f, i) => { const o = this.ctx.createOscillator(); const g = this.ctx.createGain(); o.frequency.setValueAtTime(f, this.ctx.currentTime + i * 0.08); g.gain.setValueAtTime(0, this.ctx.currentTime + i * 0.08); g.gain.setTargetAtTime(0.05 * this.seVolume, this.ctx.currentTime + i * 0.08, 0.05); g.gain.setTargetAtTime(0, this.ctx.currentTime + i * 0.08 + 0.2, 0.1); o.connect(g); g.connect(this.ctx.destination); o.start(this.ctx.currentTime + i * 0.08); o.stop(this.ctx.currentTime + i * 0.08 + 1); }); } }
+        };
+
+        const ROMAN_MAP = {
+            'あ': ['a'], 'い': ['i', 'yi'], 'う': ['u', 'wu'], 'え': ['e'], 'お': ['o'],
+            'か': ['ka'], 'き': ['ki'], 'く': ['ku'], 'け': ['ke'], 'こ': ['ko'],
+            'さ': ['sa'], 'し': ['shi', 'si'], 'す': ['su'], 'せ': ['se'], 'そ': ['so'],
+            'た': ['ta'], 'ち': ['chi', 'ti'], 'つ': ['tsu', 'tu'], 'て': ['te'], 'と': ['to'],
+            'な': ['na'], 'に': ['ni'], 'ぬ': ['nu'], 'ね': ['ne'], 'の': ['no'],
+            'は': ['ha'], 'ひ': ['hi'], 'ふ': ['fu', 'hu'], 'へ': ['he'], 'ほ': ['ho'],
+            'ま': ['ma'], 'み': ['mi'], 'む': ['mu'], 'め': ['me'], 'も': ['mo'],
+            'や': ['ya'], 'ゆ': ['yu'], 'よ': ['yo'],
+            'ら': ['ra'], 'り': ['ri'], 'る': ['ru'], 'れ': ['re'], 'ろ': ['ro'],
+            'わ': ['wa'], 'を': ['wo'], 'ん': ['nn', 'n'],
+            'が': ['ga'], 'ぎ': ['gi'], 'ぐ': ['gu'], 'げ': ['ge'], 'ご': ['go'],
+            'ざ': ['za'], 'じ': ['ji', 'zi'], 'ず': ['zu'], 'ぜ': ['ze'], 'ぞ': ['zo'],
+            'だ': ['da'], 'ぢ': ['di'], 'づ': ['du'], 'で': ['de'], 'ど': ['do'],
+            'ば': ['ba'], 'び': ['bi'], 'ぶ': ['bu'], 'べ': ['be'], 'ぼ': ['bo'],
+            'ぱ': ['pa'], 'ぴ': ['pi'], 'ぷ': ['pu'], 'ぺ': ['pe'], 'ぽ': ['po'],
+            'ぁ': ['xa', 'la'], 'ぃ': ['xi', 'li'], 'ぅ': ['xu', 'lu'], 'ぇ': ['xe', 'le'], 'ぉ': ['xo', 'lo'],
+            'ゃ': ['xya', 'lya'], 'ゅ': ['xyu', 'lyu'], 'ょ': ['xyo', 'lyo'],
+            'っ': ['xtsu', 'ltu'], 'ー': ['-'], '、': [','], '。': ['.'], '！': ['!'], '？': ['?'],
+            'きゃ': ['kya'], 'きゅ': ['kyu'], 'きょ': ['kyo'],
+            'しゃ': ['sha', 'sya'], 'しゅ': ['shu', 'syu'], 'しょ': ['sho', 'syo'],
+            'ちゃ': ['cha', 'tya', 'cya'], 'ちゅ': ['chu', 'tyu', 'cyu'], 'ちょ': ['cho', 'tyo', 'cyo'],
+            'にゃ': ['nya'], 'にゅ': ['nyu'], 'にょ': ['nyo'],
+            'ひゃ': ['hya'], 'ひゅ': ['hyu'], 'ひょ': ['hyo'],
+            'みゃ': ['mya'], 'みゅ': ['myu'], 'みょ': ['myo'],
+            'りゃ': ['rya'], 'りゅ': ['ryu'], 'りょ': ['ryo'],
+            'ぎゃ': ['gya'], 'ぎゅ': ['gyu'], 'ぎょ': ['gyo'],
+            'じゃ': ['ja', 'zya'], 'じゅ': ['ju', 'zyu'], 'じょ': ['jo', 'zyo'],
+            'びゃ': ['bya'], 'びゅ': ['byu'], 'びょ': ['byo'],
+            'ぴゃ': ['pya'], 'ぴゅ': ['pyu'], 'ぴょ': ['pyo'],
+            'ふぁ': ['fa'], 'ふぃ': ['fi'], 'ふぇ': ['fe'], 'ふぉ': ['fo'],
+            'でぃ': ['di'], 'どぅ': ['du'], 'てぃ': ['ti'], 'とぅ': ['tu'],
+            '0': ['0'], '1': ['1'], '2': ['2'], '3': ['3'], '4': ['4'], '5': ['5'], '6': ['6'], '7': ['7'], '8': ['8'], '9': ['9'],
+            '１': ['1'], '２': ['2'], '３': ['3'], '４': ['4'], '５': ['5'], '６': ['6'], '７': ['7'], '８': ['8'], '９': ['9'], '０': ['0']
+        };
+
+        class TypingEngine {
+            constructor() { this.problem = null; this.kanaIndex = 0; this.typedPart = ""; this.guideFull = ""; }
+            setProblem(p) { this.problem = p; this.kanaIndex = 0; this.typedPart = ""; this.skipSpaces(); this.updateGuide(); }
+            skipSpaces() { while (this.kanaIndex < this.problem.kana.length && (this.problem.kana[this.kanaIndex] === ' ' || this.problem.kana[this.kanaIndex] === '　')) { this.kanaIndex++; } }
+            updateGuide() {
+                let todo = ""; let idx = this.kanaIndex;
+                if (idx < this.problem.kana.length) { const curRom = this.getPossibleRomaji(idx)[0]; todo += curRom.substring(this.typedPart.length); idx += this.getSegmentLength(idx); }
+                while (idx < this.problem.kana.length) {
+                    if (this.problem.kana[idx] === ' ' || this.problem.kana[idx] === '　') { todo += "  "; idx++; }
+                    else { todo += this.getPossibleRomaji(idx)[0]; idx += this.getSegmentLength(idx); }
+                }
+                this.guideFull = todo;
+            }
+            getSegmentLength(idx) { const k = this.problem.kana; if (idx + 1 < k.length && ROMAN_MAP[k.substring(idx, idx + 2)]) return 2; return 1; }
+            getPossibleRomaji(idx) {
+                const k = this.problem.kana;
+                if (idx + 1 < k.length) { const pair = k.substring(idx, idx + 2); if (ROMAN_MAP[pair]) return ROMAN_MAP[pair]; }
+                if (k[idx] === 'っ' && idx + 1 < k.length) {
+                    const nextSeg = this.getPossibleRomaji(idx + 1);
+                    const consonants = [...new Set(nextSeg.map(r => r[0]))].filter(c => !'aiueony0123456789'.includes(c));
+                    return consonants.length > 0 ? consonants.concat(['xtsu', 'ltu']) : ['xtsu', 'ltu'];
+                }
+                return ROMAN_MAP[k[idx]] || [k[idx]];
+            }
+            handleInput(key) {
+                this.skipSpaces(); if (this.kanaIndex >= this.problem.kana.length) return false;
+                const possible = this.getPossibleRomaji(this.kanaIndex);
+                const inputAttempt = this.typedPart + key;
+                const matched = possible.find(r => r.startsWith(inputAttempt));
+                if (matched) {
+                    this.typedPart += key;
+                    if (this.typedPart === matched) { this.kanaIndex += this.getSegmentLength(this.kanaIndex); this.typedPart = ""; this.skipSpaces(); }
+                    this.updateGuide(); return true;
+                }
+                return false;
+            }
+            isFinished() { return this.kanaIndex >= this.problem.kana.length; }
+        }
+
+        /**
+         * POV Render
+         */
+        const canvas = document.getElementById('game-canvas'); const ctx = canvas.getContext('2d');
+        let width, height, stars = []; let depth = 0;
+        function resize() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize); resize();
+        function initStars() { stars = []; for (let i = 0; i < 300; i++) { stars.push({ x: Math.random() * width - width / 2, y: Math.random() * height - height / 2, z: Math.random() * width, r: Math.random() * 2 + 1, offset: Math.random() * 100 }); } }
+        initStars();
+
+        function drawPOV() {
+            const d = depth;
+            let tCol, bCol, zName; const cosmicThresh = 11000;
+            if (d < 200) { tCol = "#004488"; bCol = "#001133"; zName = "Sunlight Zone"; }
+            else if (d < 1000) { tCol = "#002244"; bCol = "#00081a"; zName = "Twilight Zone"; }
+            else if (d < 4000) { tCol = "#000b1a"; bCol = "#000000"; zName = "Midnight Zone"; }
+            else if (d < cosmicThresh) { tCol = "#05001a"; bCol = "#000000"; zName = "Hadal Zone"; }
+            else { tCol = "#0a0020"; bCol = "#000000"; zName = "Cosmic Ocean"; }
+            document.getElementById('zone-display').innerText = zName;
+            const grad = ctx.createLinearGradient(0, 0, 0, height); grad.addColorStop(0, tCol); grad.addColorStop(1, bCol);
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, width, height);
+
+            if (d >= cosmicThresh) {
+                // 星雲ガスのような動的なグラデーション表現
+                const intensity = Math.min(1.0, (d - cosmicThresh) / 5000); // 深度が進むにつれて濃くなる
+                const time = Date.now() / 3000;
+                
+                // ガスの層1（ピンク系）
+                const nGrad1 = ctx.createRadialGradient(
+                    width / 2 + Math.sin(time) * 200, height / 2 + Math.cos(time) * 100, 0,
+                    width / 2, height / 2, width * 0.8
+                );
+                nGrad1.addColorStop(0, `rgba(200, 50, 150, ${0.4 * intensity})`);
+                nGrad1.addColorStop(1, "rgba(0,0,0,0)");
+                ctx.fillStyle = nGrad1; ctx.fillRect(0, 0, width, height);
+
+                // ガスの層2（青紫系）
+                const nGrad2 = ctx.createRadialGradient(
+                    width / 2 - Math.cos(time * 0.8) * 300, height / 2 - Math.sin(time * 0.8) * 150, 0,
+                    width / 2, height / 2, width
+                );
+                nGrad2.addColorStop(0, `rgba(50, 0, 200, ${0.3 * intensity})`);
+                nGrad2.addColorStop(1, "rgba(0,0,0,0)");
+                ctx.fillStyle = nGrad2; ctx.fillRect(0, 0, width, height);
+                
+                // ガスの層3（シアン系・ハイライト）
+                const nGrad3 = ctx.createRadialGradient(
+                    width / 2, height / 2 + Math.sin(time * 1.2) * 200, 0,
+                    width / 2, height / 2, width * 0.5
+                );
+                nGrad3.addColorStop(0, `rgba(0, 255, 255, ${0.15 * intensity})`);
+                nGrad3.addColorStop(1, "rgba(0,0,0,0)");
+                ctx.fillStyle = nGrad3; ctx.fillRect(0, 0, width, height);
+            }
+
+            ctx.save(); ctx.translate(width / 2, height / 2);
+            stars.forEach(s => {
+                let speed = 5 + (d / 4000); s.z -= speed; if (s.z <= 1) s.z = width || 1000;
+                const sx = (s.x / s.z) * (width || 1000); const sy = (s.y / s.z) * (height || 800);
+                const size = Math.max(0, (1 - s.z / (width || 1000)) * 4.5);
+                ctx.fillStyle = d > cosmicThresh ? `hsla(${(Date.now() / 50 + s.offset) % 360}, 60%, 85%, 0.6)` : "rgba(0, 255, 255, 0.4)";
+                if (size > 0) { ctx.beginPath(); ctx.arc(sx, sy, size, 0, Math.PI * 2); ctx.fill(); }
+            });
+            ctx.restore();
+        }
+
+        const faceCanvas = document.getElementById('beko-face-canvas'); const fctx = faceCanvas.getContext('2d');
+        let bekoStatus = 'normal'; let emotionTimer = 0;
+        function drawBekoFace() {
+            fctx.clearRect(0, 0, 150, 90); fctx.save(); fctx.translate(75, 45); fctx.scale(0.65, 0.65); fctx.translate(-75, -45);
+            fctx.fillStyle = '#1e3a8a'; fctx.beginPath(); fctx.moveTo(10, 50); fctx.quadraticCurveTo(-10, 65, 15, 80); fctx.fill(); fctx.beginPath(); fctx.moveTo(140, 50); fctx.quadraticCurveTo(160, 65, 135, 80); fctx.fill(); fctx.beginPath(); fctx.moveTo(60, 20); fctx.lineTo(75, 5); fctx.lineTo(90, 20); fctx.fill();
+            fctx.fillStyle = '#1e40af'; fctx.beginPath(); fctx.ellipse(75, 45, 65, 30, 0, 0, Math.PI * 2); fctx.fill();
+            fctx.fillStyle = 'rgba(255, 255, 255, 0.3)'; for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) { fctx.beginPath(); fctx.arc(35 + i * 16, 35 + j * 12, 2.5, 0, Math.PI * 2); fctx.fill(); }
+            fctx.strokeStyle = '#00ffff'; fctx.lineWidth = 3; fctx.beginPath();
+            if (bekoStatus === 'miss') fctx.ellipse(75, 60, 12, 5, 0, 0, Math.PI * 2);
+            else if (bekoStatus === 'happy') fctx.arc(75, 40, 25, 0.2 * Math.PI, 0.8 * Math.PI);
+            else { fctx.moveTo(30, 55); fctx.quadraticCurveTo(75, 75, 120, 55); }
+            fctx.stroke();
+            fctx.fillStyle = '#000'; fctx.strokeStyle = '#000'; fctx.lineWidth = 3; const eyeY = 40;
+            if (bekoStatus === 'miss') { const lX = 20, rX = 130, sz = 8; fctx.beginPath(); fctx.moveTo(lX - sz, eyeY - sz); fctx.lineTo(lX + sz, eyeY); fctx.lineTo(lX - sz, eyeY + sz); fctx.stroke(); fctx.beginPath(); fctx.moveTo(rX + sz, eyeY - sz); fctx.lineTo(rX - sz, eyeY); fctx.lineTo(rX + sz, eyeY + sz); fctx.stroke(); }
+            else if (bekoStatus === 'happy') { const lX = 25, rX = 125, sz = 6; fctx.beginPath(); fctx.arc(lX, eyeY + 5, sz, Math.PI, 0); fctx.stroke(); fctx.beginPath(); fctx.arc(rX, eyeY + 5, sz, Math.PI, 0); fctx.stroke(); }
+            else { fctx.beginPath(); fctx.arc(15, eyeY, 5, 0, Math.PI * 2); fctx.fill(); fctx.beginPath(); fctx.arc(135, eyeY, 5, 0, Math.PI * 2); fctx.fill(); }
+            fctx.restore(); if (Date.now() > emotionTimer) bekoStatus = 'normal';
+            faceCanvas.style.transform = `translateY(${Math.sin(Date.now() / 500) * 2}px)`;
+        }
+
+        const engine = new TypingEngine(); let gameState = 'title', problems = [], problemIdx = 0, totalK = 0, correctK = 0, goalD = 11000;
+
+        function getStoredKey() { return localStorage.getItem('beko_typer_key') || ""; }
+        function setStoredKey(key) { localStorage.setItem('beko_typer_key', key); }
+
+        async function fetchProblems(grade, currentD) {
+            const userApiKey = document.getElementById('api-key-input').value;
+            if (userApiKey) setStoredKey(userApiKey);
+
+            const prompt = `あなたは深海冒険タイピングのシナリオライター。小学校${grade}年生向け。
+【主人公】ジンベエザメのベコちゃん。元気で好奇心旺盛。
+ベコちゃんが水深${currentD}m付近で体験するワクワクする出来事を15問作成。11000mを超えていたら宇宙の景色を描写。
+【ルール】
+1. 返事は絶対に純粋なJSON形式のみ。
+2. {"problems": [{"kanji": "...", "kana": "..."}]} の形式を守る。
+3. 同じ文章の繰り返しや単調な文は厳禁。ベコちゃんのセリフを混ぜる。
+4. 読み仮名(kana)には必ず単語ごとに半角スペースを入れる。`;
+
+            // 安定版エンドポイントへの修正 (v1beta または generateContent の正式な呼び出し方)
+            // gemini-1.5-flash-latest または 単に gemini-1.5-flash を確実に指定する
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userApiKey}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { response_mime_type: "application/json" }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error?.message || "通信エラー");
+                }
+
+                const res = await response.json();
+                const text = res.candidates[0].content.parts[0].text;
+                const data = JSON.parse(text);
+                return data.problems;
+            } catch (e) {
+                console.error("API Error:", e);
+                throw e;
+            }
+        }
+
+        async function start() {
+            const keyInput = document.getElementById('api-key-input');
+            if (!keyInput.value) {
+                document.getElementById('beko-status-text').innerText = "APIキーを入力してね！";
+                document.getElementById('beko-partner-window').classList.remove('hidden');
+                return;
+            }
+            gameState = 'loading'; document.getElementById('start-screen').classList.add('hidden'); document.getElementById('loading-screen').classList.remove('hidden');
+            document.getElementById('loading-title').innerText = "冒険の準備中"; document.getElementById('error-container').classList.add('hidden');
+            await SoundSystem.playBGM();
+            const g = document.getElementById('grade-select').value; goalD = parseInt(document.getElementById('goal-depth-select').value);
+            try {
+                problems = await fetchProblems(g, 0);
+                problemIdx = 0; depth = 0; totalK = 0; correctK = 0;
+                gameState = 'playing'; document.getElementById('loading-screen').classList.add('hidden'); document.getElementById('game-ui').classList.remove('hidden'); document.getElementById('beko-partner-window').classList.remove('hidden');
+                next();
+            } catch (e) {
+                document.getElementById('loading-title').innerText = "接続に失敗したよ";
+                document.getElementById('loading-msg').innerText = "APIキーが違うか、ネットが切れているみたい。";
+                document.getElementById('error-log').innerText = e.message;
+                document.getElementById('error-container').classList.remove('hidden');
+            }
+        }
+
+        async function next() {
+            if (depth >= goalD) { endGame(); return; }
+            if (problemIdx >= problems.length) {
+                document.getElementById('game-ui').classList.add('hidden');
+                document.getElementById('loading-screen').classList.remove('hidden');
+                document.getElementById('loading-title').innerText = "ちょっと休憩";
+                const g = document.getElementById('grade-select').value;
+                try {
+                    const more = await fetchProblems(g, depth);
+                    problems = more; problemIdx = 0; // 完全に新しいリストに入れ替える
+                    document.getElementById('loading-screen').classList.add('hidden');
+                    document.getElementById('game-ui').classList.remove('hidden');
+                } catch (e) {
+                    problems = [{ kanji: "ベコちゃんはさらに深く潜る", kana: "べこちゃんは さらに ふかく もぐる" }];
+                    problemIdx = 0;
+                    document.getElementById('loading-screen').classList.add('hidden');
+                    document.getElementById('game-ui').classList.remove('hidden');
+                }
+            }
+            engine.setProblem(problems[problemIdx]);
+            document.getElementById('target-kanji').innerText = problems[problemIdx].kanji;
+            document.getElementById('target-kana').innerText = problems[problemIdx].kana;
+            const rndMsg = ["ボクと一緒にがんばろう！", "息を合わせて どんどん潜るよ！", "きれいな場所だね、ワクワクする！", "光る生き物が 応援してくれてるよ！", "すごいぞ、その調子だ！"];
+            if (depth > 11000) rndMsg.push("宇宙にきたみたいだ！", "星の海を泳ぐの、最高だよ！");
+            document.getElementById('beko-status-text').innerText = rndMsg[Math.floor(Math.random() * rndMsg.length)];
+            updateUI();
+        }
+
+        function updateUI() { document.getElementById('romaji-todo').innerText = engine.guideFull; document.getElementById('depth-display').innerText = `${depth} m / ${goalD} m`; }
+        function endGame() { gameState = 'result'; SoundSystem.playClear(); document.getElementById('game-ui').classList.add('hidden'); document.getElementById('beko-partner-window').classList.add('hidden'); document.getElementById('result-screen').classList.remove('hidden'); document.getElementById('final-depth').innerText = `${depth} m`; const acc = totalK > 0 ? Math.floor((correctK / totalK) * 100) : 0; document.getElementById('accuracy-rate').innerText = `${acc} %`; }
+
+        window.addEventListener('keydown', (e) => {
+            if (gameState !== 'playing') return;
+            if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return;
+            if (e.key === ' ') { e.preventDefault(); return; }
+            const key = e.key.toLowerCase(); if (key.length !== 1) return;
+            totalK++;
+            if (engine.handleInput(key)) {
+                SoundSystem.playType(); correctK++; depth += 10; updateUI();
+                if (engine.isFinished()) { bekoStatus = 'happy'; emotionTimer = Date.now() + 1500; SoundSystem.playClear(); problemIdx++; setTimeout(next, 800); }
+            } else { SoundSystem.playMiss(); bekoStatus = 'miss'; emotionTimer = Date.now() + 1000; depth = Math.max(0, depth - 30); updateUI(); }
+        });
+
+        const input = document.getElementById('hidden-input');
+        window.addEventListener('touchstart', () => input.focus());
+        document.getElementById('start-btn').addEventListener('click', start);
+        document.getElementById('retry-btn').addEventListener('click', () => location.reload());
+        document.getElementById('retire-btn').addEventListener('click', () => location.reload());
+        document.getElementById('error-back-btn').addEventListener('click', () => location.reload());
+        document.getElementById('bgm-volume').addEventListener('input', () => SoundSystem.updateVolumes());
+        document.getElementById('se-volume').addEventListener('input', () => SoundSystem.updateVolumes());
+        window.addEventListener('DOMContentLoaded', () => { document.getElementById('api-key-input').value = getStoredKey(); });
+        function loop() { drawPOV(); drawBekoFace(); requestAnimationFrame(loop); }
+        loop();
+    </script>
+</body>
+
+</html>
