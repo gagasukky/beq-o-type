@@ -472,9 +472,10 @@
 3. 同じ文章の繰り返しや単調な文は厳禁。ベコちゃんのセリフを混ぜる。
 4. 読み仮名(kana)には必ず単語ごとに半角スペースを入れる。`;
 
-            // 安定版エンドポイントへの修正 (v1beta または generateContent の正式な呼び出し方)
-            // gemini-1.5-flash-latest または 単に gemini-1.5-flash を確実に指定する
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userApiKey}`;
+            // エンドポイントの修正 (`v1beta` ではモデル名のサフィックス等が必要になるケースがあるため、より安定している `v1` に戻す。URLの組み立て方を正確に行う)
+            // 公式ドキュメント準拠: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent が基本だがエラーが出る場合
+            // `v1` の `gemini-1.5-flash` エンドポイントを使用する
+            const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${userApiKey}`;
 
             try {
                 const response = await fetch(url, {
