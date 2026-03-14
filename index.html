@@ -472,8 +472,11 @@
 3. 同じ文章の繰り返しや単調な文は厳禁。ベコちゃんのセリフを混ぜる。
 4. 読み仮名(kana)には必ず単語ごとに半角スペースを入れる。`;
 
-            // エンドポイントの修正 (`response_mime_type` などの高度な設定は `v1beta` のみ対応しているため、v1betaに戻し、モデル名を正確に指定します)
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userApiKey}`;
+            // エンドポイントの修正:
+            // v1beta の gemini-1.5-flash が見つからない問題に対して、
+            // gemini-1.5-flash-latest を明示的に指定します。
+            const modelName = "gemini-1.5-flash-latest"; 
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${userApiKey}`;
 
             try {
                 const response = await fetch(url, {
@@ -481,7 +484,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { responseMimeType: "application/json" } // REST APIではキャメルケース (responseMimeType または response_mime_type だが Node SDKとは異なる場合がある。v1betaでは通常のJSON指定で動作)
+                        generationConfig: { responseMimeType: "application/json" }
                     })
                 });
 
